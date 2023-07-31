@@ -4,7 +4,10 @@ const fs = require('fs');
 
 // Screen size
 const PUPPETEER_VIEWPORT = {width: 1080, height: 1024};
-const PUPPETEER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox']
+const PUPPETEER_LAUNCH_OPTIONS = {
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: 'new'
+}
 
 // Dump output dir
 const DUMP_DIR = `${__dirname}/dump`
@@ -20,19 +23,21 @@ async function run(albumURL){
     let browser = null;
 
     try{
-        console.log(`Downloading lyrics for songs in ${albumURL}`);
+        let albumParts = albumURL.split('/');
+        let albumName = albumParts[albumParts.length - 1];
+        console.log(`Downloading lyrics for songs in "${albumName}"`);
 
         // Create browser and page for scraping
-        browser = await puppeteer.launch({args: PUPPETEER_ARGS});
+        browser = await puppeteer.launch(PUPPETEER_LAUNCH_OPTIONS);
         let page = await browser.newPage();
 
         // Get song URLs from album page
         let songURLs = await getSongURLsFromAlbumURL(page, albumURL);
         // Iterate over songs and save lyrics to file
         for (let songName in songURLs){
-            console.log(`  Downloading lyrics for ${songName}`);
+            console.log(`  Downloading lyrics for "${songName}"`);
             let lyrics = await getLyricsOfSongURL(page, songURLs[songName]);
-            dumpLyrics(songName, lyrics);
+            dumpLyrics(albumName, songName, lyrics);
         }
     }
     catch(err){
@@ -124,11 +129,15 @@ async function getLyricsOfSongURL(page, songURL){
     }
 }
 
-async function dumpLyrics(songName, lyrics){
+async function dumpLyrics(albumName, songName, lyrics){
     try{
-        // File name based on song name
-        let filepath = `${DUMP_DIR}/${songName}.lyrics`;
+        // File name based on album and song name
+        let dirpath = `${DUMP_DIR}/${albumName}`;
+        let filepath = `${dirpath}/${songName}.lyrics`;
         
+        // Create dump and album dir
+        fs.mkdirSync(dirpath, {recursive: true});
+
         // Write the lyrics
         fs.writeFileSync(filepath, lyrics, 'utf-8')
     }
