@@ -45,6 +45,7 @@ async function getHtmlOfUrl(page, url){
         // Navigate in page
         await page.goto(url);
         await page.setViewport(PUPPETEER_VIEWPORT);
+        // await scrollPage(page);
 
         // Download the html
         let html = await page.content();
@@ -54,6 +55,32 @@ async function getHtmlOfUrl(page, url){
     }
     catch(err){
         throw new Error('getHtmlOfUrl', err);
+    }
+}
+
+async function scrollPage(page){
+    try{
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                const SCROLL_DISTANCE = 50;
+                const SCROLL_INTERVAL = 100;
+
+                let scrolled = 0;
+
+                let handle = setInterval(() => {
+                    window.scrollBy(0, SCROLL_DISTANCE);
+                    scrolled += SCROLL_DISTANCE;
+
+                    if (scrolled >= document.body.scrollHeight - window.innerHeight){
+                        clearInterval(handle);
+                        resolve();
+                    }
+                }, SCROLL_INTERVAL);
+            })
+        })
+    }
+    catch(err){
+        throw new Error('scrollPage', err);
     }
 }
 
@@ -86,14 +113,18 @@ async function getLyricsOfSongURL(page, songURL){
         let $ = cheerio.load(html);
 
         let divs = $('div');
+        let blocks = [];
         for (let div of divs){
             if ($(div).attr('data-lyrics-container')){
-                let lyrics = $(div).text().trim();
-                return lyrics;
+                let oldHTML = $(div).html();
+                let newHTML = oldHTML.replace(/<br\s?\/?>/gi, '\n');
+
+                let block = $(div).html(newHTML).text().trim();
+                blocks.push(block);
             }
         }
         
-        throw new Error('getLyricsOfSongURL', 'Lyrics not found');
+        return blocks.join('\n\n');
     }
     catch(err){
         throw new Error('getLyricsOfSongURL', err);
